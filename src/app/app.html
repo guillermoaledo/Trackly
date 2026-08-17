@@ -1,0 +1,280 @@
+<main class="habits-page">
+  @if (updateAvailable()) {
+    <section class="update-notice" role="status">
+      <span>Hay una nueva versión disponible.</span>
+      <button type="button" (click)="applyUpdate()">Actualizar</button>
+    </section>
+  }
+
+  <header class="page-header">
+    <p class="eyebrow">Hoy</p>
+    <h1>Mis hábitos</h1>
+  </header>
+
+  @if (habitStore.initializationError(); as error) {
+    <section class="status-message status-message--error" role="alert">
+      <p>{{ error }}</p>
+      <button
+        type="button"
+        [disabled]="habitStore.isInitializing()"
+        (click)="retryInitialization()"
+      >
+        {{ habitStore.isInitializing() ? 'Reintentando…' : 'Reintentar' }}
+      </button>
+    </section>
+  } @else if (habitStore.isInitializing()) {
+    <p class="status-message" role="status">Cargando tus hábitos…</p>
+  }
+
+  @if (habitStore.operationError(); as error) {
+    <section class="status-message status-message--error" role="alert">
+      <p>{{ error }}</p>
+      <button type="button" (click)="habitStore.clearOperationError()">Cerrar</button>
+    </section>
+  }
+
+  @if (habitStore.isInitialized()) {
+    @if (habitStore.habits().length === 0) {
+      <section class="empty-state" aria-labelledby="empty-title">
+        <div class="empty-state__icon" aria-hidden="true">✓</div>
+        <h2 id="empty-title">Empieza con algo pequeño</h2>
+        <p>Crea tu primer hábito y márcalo cuando lo completes hoy.</p>
+      </section>
+    } @else {
+      <section class="habit-list" aria-label="Hábitos de hoy">
+        @for (habit of habitStore.habits(); track habit.id) {
+          @if (editingHabitId === habit.id) {
+            <form class="habit habit-edit" (ngSubmit)="saveHabitEdit(habit.id)" novalidate>
+              <label [for]="'edit-habit-' + habit.id">Editar hábito</label>
+              <input
+                [id]="'edit-habit-' + habit.id"
+                name="editHabitName"
+                type="text"
+                maxlength="100"
+                autocomplete="off"
+                [attr.aria-describedby]="showEditValidationError ? 'edit-habit-error' : null"
+                [attr.aria-invalid]="showEditValidationError || null"
+                [(ngModel)]="editHabitName"
+                (ngModelChange)="onEditNameChange()"
+              />
+              <fieldset class="frequency-selector">
+                <legend>Frecuencia</legend>
+                <div class="frequency-options">
+                  <label>
+                    <input
+                      type="radio"
+                      name="editFrequencyType"
+                      value="daily"
+                      [(ngModel)]="editFrequencyType"
+                      (ngModelChange)="onEditFrequencyTypeChange()"
+                    />
+                    Todos los días
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="editFrequencyType"
+                      value="specific-days"
+                      [(ngModel)]="editFrequencyType"
+                      (ngModelChange)="onEditFrequencyTypeChange()"
+                    />
+                    Días específicos
+                  </label>
+                </div>
+                @if (editFrequencyType === 'specific-days') {
+                  <div class="weekday-selector" aria-label="Días programados">
+                    @for (day of weekdayOptions; track day.value) {
+                      <button
+                        type="button"
+                        [attr.aria-label]="day.label"
+                        [attr.aria-pressed]="selectedEditDays.includes(day.value)"
+                        [class.weekday--selected]="selectedEditDays.includes(day.value)"
+                        (click)="toggleEditDay(day.value)"
+                      >
+                        {{ day.shortLabel }}
+                      </button>
+                    }
+                  </div>
+                }
+                @if (showEditFrequencyValidationError) {
+                  <p class="validation-message" aria-live="polite">Selecciona al menos un día.</p>
+                }
+              </fieldset>
+              <div class="habit-edit__actions">
+                <button class="text-action" type="button" (click)="cancelHabitEdit()">
+                  Cancelar
+                </button>
+                <button class="text-action text-action--primary" type="submit">Guardar</button>
+              </div>
+              @if (showEditValidationError) {
+                <p id="edit-habit-error" class="validation-message" aria-live="polite">
+                  Escribe un nombre para el hábito.
+                </p>
+              }
+            </form>
+          } @else {
+            <article class="habit" [class.habit--completed]="habitStore.isCompletedToday(habit.id)">
+              <button
+                class="habit__toggle"
+                type="button"
+                role="checkbox"
+                [attr.aria-label]="
+                  habitStore.isCompletedToday(habit.id)
+                    ? 'Desmarcar ' + habit.name
+                    : 'Completar ' + habit.name
+                "
+                [attr.aria-checked]="habitStore.isCompletedToday(habit.id)"
+                [disabled]="
+                  habitStore.isCompletionPending(habit.id) || !habitStore.canToggleToday(habit)
+                "
+                (click)="toggleHabit(habit.id)"
+              >
+                <span class="habit__check" aria-hidden="true">✓</span>
+              </button>
+              <span class="habit__content">
+                <span class="habit__name">{{ habit.name }}</span>
+                <span class="habit__meta">
+                  {{ habitStore.getFrequencyLabel(habit) }}
+                  @if (!habitStore.isScheduledToday(habit)) {
+                    · No corresponde hoy
+                  }
+                </span>
+              </span>
+              <div class="habit__actions">
+                <button
+                  class="habit__action"
+                  type="button"
+                  [attr.aria-label]="'Editar ' + habit.name"
+                  (click)="startHabitEdit(habit)"
+                >
+                  <span aria-hidden="true">✎</span>
+                </button>
+                <button
+                  class="habit__action habit__action--delete"
+                  type="button"
+                  [attr.aria-label]="'Eliminar ' + habit.name"
+                  (click)="requestHabitDeletion(habit)"
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
+              </div>
+            </article>
+          }
+        }
+      </section>
+    }
+  }
+</main>
+
+<form class="habit-composer" (ngSubmit)="createHabit()" novalidate>
+  <div class="habit-composer__inner">
+    <label for="habit-name">Nuevo hábito</label>
+    <div class="habit-composer__controls">
+      <input
+        id="habit-name"
+        name="habitName"
+        type="text"
+        inputmode="text"
+        autocomplete="off"
+        maxlength="100"
+        placeholder="Ej. Beber agua"
+        [disabled]="!habitStore.isInitialized()"
+        [attr.aria-describedby]="showValidationError ? 'habit-name-error' : null"
+        [attr.aria-invalid]="showValidationError || null"
+        [(ngModel)]="habitName"
+        (ngModelChange)="onHabitNameChange()"
+      />
+      <button type="submit" aria-label="Crear hábito" [disabled]="!habitStore.isInitialized()">
+        Añadir
+      </button>
+    </div>
+    <fieldset class="frequency-selector frequency-selector--composer">
+      <legend>Frecuencia</legend>
+      <div class="frequency-options">
+        <label>
+          <input
+            type="radio"
+            name="habitFrequencyType"
+            value="daily"
+            [disabled]="!habitStore.isInitialized()"
+            [(ngModel)]="habitFrequencyType"
+            (ngModelChange)="onCreateFrequencyTypeChange()"
+          />
+          Todos los días
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="habitFrequencyType"
+            value="specific-days"
+            [disabled]="!habitStore.isInitialized()"
+            [(ngModel)]="habitFrequencyType"
+            (ngModelChange)="onCreateFrequencyTypeChange()"
+          />
+          Días específicos
+        </label>
+      </div>
+      @if (habitFrequencyType === 'specific-days') {
+        <div class="weekday-selector" aria-label="Días programados">
+          @for (day of weekdayOptions; track day.value) {
+            <button
+              type="button"
+              [attr.aria-label]="day.label"
+              [attr.aria-pressed]="selectedHabitDays.includes(day.value)"
+              [class.weekday--selected]="selectedHabitDays.includes(day.value)"
+              (click)="toggleCreateDay(day.value)"
+            >
+              {{ day.shortLabel }}
+            </button>
+          }
+        </div>
+      }
+      @if (showFrequencyValidationError) {
+        <p class="validation-message" aria-live="polite">Selecciona al menos un día.</p>
+      }
+    </fieldset>
+    @if (showValidationError) {
+      <p id="habit-name-error" class="validation-message" aria-live="polite">
+        Escribe un nombre para el hábito.
+      </p>
+    }
+  </div>
+</form>
+
+<dialog
+  #deleteDialog
+  class="confirmation"
+  aria-labelledby="delete-title"
+  aria-describedby="delete-description"
+  (cancel)="cancelHabitDeletion($event)"
+  (close)="onDeletionDialogClosed()"
+>
+  @if (habitPendingDeletion; as habit) {
+    <h2 id="delete-title">¿Eliminar este hábito?</h2>
+    <p id="delete-description">
+      “{{ habit.name }}” y todos sus cumplimientos se eliminarán definitivamente.
+    </p>
+    @if (habitStore.operationError(); as error) {
+      <p class="confirmation__error" role="alert">{{ error }}</p>
+    }
+    <div class="confirmation__actions">
+      <button
+        class="confirmation__cancel"
+        type="button"
+        autofocus
+        [disabled]="isDeletingHabit"
+        (click)="cancelHabitDeletion()"
+      >
+        Cancelar
+      </button>
+      <button
+        class="confirmation__delete"
+        type="button"
+        [disabled]="isDeletingHabit"
+        (click)="confirmHabitDeletion()"
+      >
+        {{ isDeletingHabit ? 'Eliminando…' : 'Eliminar hábito' }}
+      </button>
+    </div>
+  }
+</dialog>
