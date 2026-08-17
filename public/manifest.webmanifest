@@ -5,8 +5,8 @@
   "theme_color": "#247a4d",
   "background_color": "#f4f7f5",
   "display": "standalone",
-  "scope": "/",
-  "start_url": "/",
+  "scope": "/trackly/",
+  "start_url": "/trackly/",
   "icons": [
     {
       "src": "icons/icon-72x72.png",
